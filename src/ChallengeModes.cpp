@@ -476,20 +476,32 @@ public:
     void OnPlayerKilledByCreature(Creature* /*killer*/, Player* player) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_SEMI_HARDCORE, player))
-        {
             return;
-        }
+
         for (uint8 i = 0; i < EQUIPMENT_SLOT_END; ++i)
         {
             if (Item* pItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
             {
-                if (pItem->GetTemplate() && !pItem->IsEquipped())
+                if (!pItem->IsEquipped())
                     continue;
-                uint8 slot = pItem->GetSlot();
-                ChatHandler(player->GetSession()).PSendSysMessage("|cffDA70D6You have lost your |cffffffff|Hitem:%d:0:0:0:0:0:0:0:0|h[%s]|h|r", pItem->GetEntry(), pItem->GetTemplate()->Name1.c_str());
-                player->DestroyItem(INVENTORY_SLOT_BAG_0, slot, true);
+
+                ItemTemplate const* proto = pItem->GetTemplate();
+                if (!proto)
+                    continue;
+
+                std::string itemName = proto->Name1;
+                if (itemName.empty())
+                    itemName = "Unknown Item";
+
+                std::ostringstream msg;
+                msg << "|cffDA70D6You have lost your |cffffffff|Hitem:" << proto->ItemId
+                << ":0:0:0:0:0:0:0:0|h[" << itemName << "]|h|r";
+                ChatHandler(player->GetSession()).SendSysMessage(msg.str().c_str());
+
+                player->DestroyItem(INVENTORY_SLOT_BAG_0, pItem->GetSlot(), true);
             }
         }
+
         player->SetMoney(0);
     }
 
