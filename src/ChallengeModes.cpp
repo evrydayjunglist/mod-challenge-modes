@@ -330,7 +330,7 @@ public:
         return (mapToCheck->find(key) != mapToCheck->end());
     }
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* /*victim*/, uint8 /*xpSource*/) override
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* /*victim*/, uint8 /*xpSource*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(settingName, player))
         {
@@ -339,7 +339,7 @@ public:
         amount *= sChallengeModes->getXpBonusForChallenge(settingName);
     }
 
-void OnLevelChanged(Player* player, uint8 /*oldlevel*/) override
+void OnPlayerLevelChanged(Player* player, uint8 /*oldlevel*/) override
 {
     if (!sChallengeModes->challengeEnabledForPlayer(settingName, player))
     {
@@ -407,7 +407,7 @@ class ChallengeMode_Hardcore : public ChallengeMode
 public:
     ChallengeMode_Hardcore() : ChallengeMode("ChallengeMode_Hardcore", SETTING_HARDCORE) {}
 
-    void OnLogin(Player* player) override
+    void OnPlayerLogin(Player* player) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, player) || !sChallengeModes->challengeEnabledForPlayer(HARDCORE_DEAD, player))
         {
@@ -427,7 +427,7 @@ public:
         player->GetSession()->KickPlayer("Hardcore character died");
     }
 
-    void OnPVPKill(Player* /*killer*/, Player* killed) override
+    void OnPlayerPVPKill(Player* /*killer*/, Player* killed) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_HARDCORE, killed))
         {
@@ -457,14 +457,14 @@ public:
         player->GetSession()->KickPlayer("Hardcore character died");
     }
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
     {
-        ChallengeMode::OnGiveXP(player, amount, victim, xpSource);
+        ChallengeMode::OnPlayerGiveXP(player, amount, victim, xpSource);
     }
 
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
+    void OnPlayerLevelChanged(Player* player, uint8 oldlevel) override
     {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
+        ChallengeMode::OnPlayerLevelChanged(player, oldlevel);
     }
 };
 
@@ -476,31 +476,43 @@ public:
     void OnPlayerKilledByCreature(Creature* /*killer*/, Player* player) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_SEMI_HARDCORE, player))
-        {
             return;
-        }
+
         for (uint8 i = 0; i < EQUIPMENT_SLOT_END; ++i)
         {
             if (Item* pItem = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
             {
-                if (pItem->GetTemplate() && !pItem->IsEquipped())
+                if (!pItem->IsEquipped())
                     continue;
-                uint8 slot = pItem->GetSlot();
-                ChatHandler(player->GetSession()).PSendSysMessage("|cffDA70D6You have lost your |cffffffff|Hitem:%d:0:0:0:0:0:0:0:0|h[%s]|h|r", pItem->GetEntry(), pItem->GetTemplate()->Name1.c_str());
-                player->DestroyItem(INVENTORY_SLOT_BAG_0, slot, true);
+
+                ItemTemplate const* proto = pItem->GetTemplate();
+                if (!proto)
+                    continue;
+
+                std::string itemName = proto->Name1;
+                if (itemName.empty())
+                    itemName = "Unknown Item";
+
+                std::ostringstream msg;
+                msg << "|cffDA70D6You have lost your |cffffffff|Hitem:" << proto->ItemId
+                << ":0:0:0:0:0:0:0:0|h[" << itemName << "]|h|r";
+                ChatHandler(player->GetSession()).SendSysMessage(msg.str().c_str());
+
+                player->DestroyItem(INVENTORY_SLOT_BAG_0, pItem->GetSlot(), true);
             }
         }
+
         player->SetMoney(0);
     }
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
     {
-        ChallengeMode::OnGiveXP(player, amount, victim, xpSource);
+        ChallengeMode::OnPlayerGiveXP(player, amount, victim, xpSource);
     }
 
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
+    void OnPlayerLevelChanged(Player* player, uint8 oldlevel) override
     {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
+        ChallengeMode::OnPlayerLevelChanged(player, oldlevel);
     }
 };
 
@@ -509,7 +521,7 @@ class ChallengeMode_SelfCrafted : public ChallengeMode
 public:
     ChallengeMode_SelfCrafted() : ChallengeMode("ChallengeMode_SelfCrafted", SETTING_SELF_CRAFTED) {}
 
-    bool CanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
+    bool OnPlayerCanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_SELF_CRAFTED, player))
         {
@@ -522,14 +534,14 @@ public:
         return pItem->GetGuidValue(ITEM_FIELD_CREATOR) == player->GetGUID();
     }
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
     {
-        ChallengeMode::OnGiveXP(player, amount, victim, xpSource);
+        ChallengeMode::OnPlayerGiveXP(player, amount, victim, xpSource);
     }
 
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
+    void OnPlayerLevelChanged(Player* player, uint8 oldlevel) override
     {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
+        ChallengeMode::OnPlayerLevelChanged(player, oldlevel);
     }
 };
 
@@ -538,7 +550,7 @@ class ChallengeMode_ItemQualityLevel : public ChallengeMode
 public:
     ChallengeMode_ItemQualityLevel() : ChallengeMode("ChallengeMode_ItemQualityLevel", SETTING_ITEM_QUALITY_LEVEL) {}
 
-    bool CanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
+    bool OnPlayerCanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_ITEM_QUALITY_LEVEL, player))
         {
@@ -547,14 +559,14 @@ public:
         return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
     }
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
     {
-        ChallengeMode::OnGiveXP(player, amount, victim, xpSource);
+        ChallengeMode::OnPlayerGiveXP(player, amount, victim, xpSource);
     }
 
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
+    void OnPlayerLevelChanged(Player* player, uint8 oldlevel) override
     {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
+        ChallengeMode::OnPlayerLevelChanged(player, oldlevel);
     }
 };
 
@@ -563,14 +575,14 @@ class ChallengeMode_SlowXpGain : public ChallengeMode
 public:
     ChallengeMode_SlowXpGain() : ChallengeMode("ChallengeMode_SlowXpGain", SETTING_SLOW_XP_GAIN) {}
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
     {
-        ChallengeMode::OnGiveXP(player, amount, victim, xpSource);
+        ChallengeMode::OnPlayerGiveXP(player, amount, victim, xpSource);
     }
 
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
+    void OnPlayerLevelChanged(Player* player, uint8 oldlevel) override
     {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
+        ChallengeMode::OnPlayerLevelChanged(player, oldlevel);
     }
 };
 
@@ -579,14 +591,14 @@ class ChallengeMode_VerySlowXpGain : public ChallengeMode
 public:
     ChallengeMode_VerySlowXpGain() : ChallengeMode("ChallengeMode_VerySlowXpGain", SETTING_VERY_SLOW_XP_GAIN) {}
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
     {
-        ChallengeMode::OnGiveXP(player, amount, victim, xpSource);
+        ChallengeMode::OnPlayerGiveXP(player, amount, victim, xpSource);
     }
 
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
+    void OnPlayerLevelChanged(Player* player, uint8 oldlevel) override
     {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
+        ChallengeMode::OnPlayerLevelChanged(player, oldlevel);
     }
 };
 
@@ -595,7 +607,7 @@ class ChallengeMode_QuestXpOnly : public ChallengeMode
 public:
     ChallengeMode_QuestXpOnly() : ChallengeMode("ChallengeMode_QuestXpOnly", SETTING_QUEST_XP_ONLY) {}
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_QUEST_XP_ONLY, player))
         {
@@ -611,13 +623,13 @@ public:
         }
         else
         {
-            ChallengeMode::OnGiveXP(player, amount, victim, xpSource);
+            ChallengeMode::OnPlayerGiveXP(player, amount, victim, xpSource);
         }
     }
 
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
+    void OnPlayerLevelChanged(Player* player, uint8 oldlevel) override
     {
-        ChallengeMode::OnLevelChanged(player, oldlevel);
+        ChallengeMode::OnPlayerLevelChanged(player, oldlevel);
     }
 };
 
@@ -636,31 +648,31 @@ public:
         player->KillPlayer();
     }
 
-    void OnGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 xpSource) override
     {
-        ChallengeMode::OnGiveXP(player, amount, victim, xpSource);
+        ChallengeMode::OnPlayerGiveXP(player, amount, victim, xpSource);
     }
 
-    void OnLevelChanged(Player* player, uint8 oldlevel) override
-    {
-        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
-        {
-            return;
-        }
-        player->SetFreeTalentPoints(0); // Remove all talent points
-        ChallengeMode::OnLevelChanged(player, oldlevel);
-    }
-
-    void OnTalentsReset(Player* player, bool /*noCost*/) override
+    void OnPlayerLevelChanged(Player* player, uint8 oldlevel) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
         {
             return;
         }
         player->SetFreeTalentPoints(0); // Remove all talent points
+        ChallengeMode::OnPlayerLevelChanged(player, oldlevel);
     }
 
-    bool CanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
+    void OnPlayerTalentsReset(Player* player, bool /*noCost*/) override
+    {
+        if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
+        {
+            return;
+        }
+        player->SetFreeTalentPoints(0); // Remove all talent points
+    }
+
+    bool OnPlayerCanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem, bool /*swap*/, bool /*not_loading*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
         {
@@ -669,7 +681,7 @@ public:
         return pItem->GetTemplate()->Quality <= ITEM_QUALITY_NORMAL;
     }
 
-    bool CanApplyEnchantment(Player* player, Item* /*item*/, EnchantmentSlot /*slot*/, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
+    bool OnPlayerCanApplyEnchantment(Player* player, Item* /*item*/, EnchantmentSlot /*slot*/, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
         {
@@ -679,7 +691,7 @@ public:
         return false;
     }
 
-    void OnLearnSpell(Player* player, uint32 spellID) override
+    void OnPlayerLearnSpell(Player* player, uint32 spellID) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
         {
@@ -713,7 +725,7 @@ public:
         }
     }
 
-    bool CanUseItem(Player* player, ItemTemplate const* proto, InventoryResult& /*result*/) override
+    bool OnPlayerCanUseItem(Player* player, ItemTemplate const* proto, InventoryResult& /*result*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
         {
@@ -748,7 +760,7 @@ public:
         return true;
     }
 
-    bool CanGroupInvite(Player* player, std::string& /*membername*/) override
+    bool OnPlayerCanGroupInvite(Player* player, std::string& /*membername*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
         {
@@ -757,7 +769,7 @@ public:
         return false;
     }
 
-    bool CanGroupAccept(Player* player, Group* /*group*/) override
+    bool OnPlayerCanGroupAccept(Player* player, Group* /*group*/) override
     {
         if (!sChallengeModes->challengeEnabledForPlayer(SETTING_IRON_MAN, player))
         {
